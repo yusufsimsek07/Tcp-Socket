@@ -26,7 +26,7 @@ public class ChatGUI extends JFrame {
 
         JPanel pnlTop = new JPanel(new FlowLayout(FlowLayout.LEFT));
         txtIp = new JTextField("127.0.0.1", 10);
-        txtPort = new JTextField("5000", 5);
+        txtPort = new JTextField("5555", 5);
         txtUsername = new JTextField(10);
         btnConnect = new JButton("Baglan");
         btnDisconnect = new JButton("Cikis");

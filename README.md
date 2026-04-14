@@ -1,50 +1,52 @@
-# 💬 Java TCP Chat & File Sync 
+# Sohbet ve Dosya Paylaşım Uygulaması (Java Socket & Multithreading)
 
-A robust, multi-threaded Client-Server chat application built entirely from scratch using **Java SE (Swing & TCP Sockets)**. It features real-time messaging, private mentions, seamless file transfers, and a live online user directory—all powered by a custom asynchronous binary/text protocol.
+## Projenin Amacı
+Bu projenin temel amacı, Java platformunda TCP/IP protokolü ve ağ (network) soket programlamasını kullanarak, birden fazla kullanıcının anlık olarak haberleşebileceği, özel veya genel mesaj gönderebileceği ve kendi aralarında dosya aktarımı yapabileceği, istemci-sunucu (client-server) tabanlı eşzamanlı bir sohbet yazılımı geliştirmektir.
 
----
+## İstemci Sunucu (Client-Server) Mimarisi Açıklaması
+Dağıtık uygulamaların temel tasarım deseni olan istemci-sunucu modelinde; veriyi ve ana yönetimi barındıran merkezi bir 'Sunucu (Server)' yazılımı ile bu veriden yararlanmak isteyen uç birim 'İstemci (Client)' yazılımları bulunur. Projemizde sunucu tek bir merkezde ağ bağlantılarını dinleyen uygulamadır. İstemciler ise kullanıcının sistemine kurulan arayüzlü uygulamalardır. Tüm mesaj ve aktarım trafiği, sunucu üzerinden organize edilerek yönlendirilmektedir.
 
-## ✨ Features
+## TCP Socket Nedir?
+Transmission Control Protocol (TCP), veri paketlerinin sıralı, güvenilir ve kayıpsız bir şekilde ulaştırılmasını garanti eden bir ağ protokolüdür. Socket ise iki farklı ağ cihazı üzerinde çalışan yazılımların birbirleri ile bir iletişim tüneli oluşturabilmesini sağlayan bir uç noktasıdır (endpoint). Dosya ve anlık mesaj trafiğinde hiçbir verinin eksik gitmemesi adına, uygulamada bağlantı odaklı çalışan TCP soketleri kullanılmıştır.
 
-- **Real-Time Global Chat:** Instant message broadcasting to all connected users.
-- **Private Messaging:** Built-in mention system. Just type `@username Hello!` to send a private message seamlessly.
-- **File Transfer Protocol:** Send and receive binary files of any type. The system streams files over the active socket connection synchronously.
-- **Live User Directory:** A side panel that instantly updates who goes online or offline.
-- **Multi-threaded Architecture:** 100% non-blocking. The server spawns dedicated `ClientHandler` threads for every connection, ensuring zero wait times and UI lockups.
-- **Zero Dependencies:** Pure Java (`java.net`, `java.io`, `javax.swing`). No external libraries required.
+## Multithreading Neden Kullanıldı?
+Ağ üzerinden dinleme yapmak veya veri okumak genel bir uygulama işleyişini "bloke eder" (blocking I/O). Server, birinci istemci ile ilgilenirken ikinci bir istemcinin bağlantısını bekletmek ve tüm sistemi kilitlemek zorunda kalırdı. Aynı şekilde arayüzlü (GUI) bir uygulamada sunucudan mesaj gelmesini aynı mantıkla beklemek, kullanıcının butona tıklamasını engeller. Bu yüzden projedeki tüm asenkron işlemlerde Multithreading (çok iş parçacıklı yapı) kullanılmıştır. Bağlanan her istemci kendisine ait bağımsız bir `Thread` üzerinde yaşar ve bu sayede işlemler paralel gerçekleşir.
 
-## 🛠️ Architecture & Tech Stack
+## Protokol Sistemi Nasıl Çalışıyor?
+Projeye ait ağ haberleşmesi, tamamen istemci ile sunucu arasında karar verilmiş "|" (pipe) ayracı mantığına dayalı string komutlara ve binary okumalarına dayanır.
+`DataInputStream` ve `DataOutputStream` kullanılarak önce bir string komut (UTF-8 formunda) gönderilir. Gelen komutun ilk kelimesi (örneğin "MESSAGE|", "FILE|") tetikleyici rol oynar. Komut geldiğinde parçalanır ve hedef işleme yönlendirilir.
 
-- **Language:** Java SE 
-- **GUI Framework:** Java Swing
-- **Network Programming:** TCP Sockets (`java.net.Socket`, `ServerSocket`)
-- **Concurrency:** Multi-threading (`Runnable`, `Thread`, `ConcurrentHashMap`)
-- **I/O Management:** Data Streams (`DataInputStream`, `DataOutputStream`)
+## Server Tarafının Çalışma Mantığı
+Sunucu (`ChatServer`), uygulamanın kalbi niteliğindedir. Belirlenen ağ portu üzerinden dinlemeye başlar. Sokete yeni bir istemci düştüğünde anında bir `ClientHandler` thread'i yaratılarak havuzdaki yerine alınır. Bağlı istemciler anlık bir iş parçacığı güvenli sözlükte (`ConcurrentHashMap`) adlarıyla tutulur. Sunucu her gelen paketi analiz eder ve hedefine, private (özel) ya da broadcast (genel) yönlendirir.
 
-### 🔌 Custom Protocol
-The app uses a lightweight, custom pipe-delimited (`|`) UTF-8 protocol:
-- `CONNECT|username`
-- `MESSAGE|username|content`
-- `PRIVATE|username|content` 
-- `FILE|sender|filename|bytesize` 
-- `USERLIST|user1,user2...`
+## Client Tarafının Çalışma Mantığı
+İstemci yazılımı başlıca üç olay üzerinde durur: Arayüz akışları (`ChatGUI`), veri yollama sistemi (`ChatClient`) ve bir arka plan işçisi sayesinde sunucuyu sürekli dinleyen `ClientListener`. Kullanıcı arayüz üzerinden işlem yaptığında sokete bir paket atılır; aynı zamanda sunucudan bir veri gelirse Listener thread'i asenkron uyanır ve arayüze güncellemeleri yansıtır.
 
-## 🚀 Getting Started
+## GUI Bileşenlerinin Görevleri
+Sistemin görsel mimarisi Java Swing üzerinden tasarlanmıştır. Pencerenin en üst bölümünde IP, Port, Kullanıcı Adı ve oturum açma komponentleri mevcuttur. Sol tarafta bir liste modeli bağlanan kullanıcıları saniyesinde yeniler. Orta panel tamamen mesaj geçmisi, alt bölüm ise ileti ve dosyaları sunucuya seçip postalama mekanizmaları üzerine kuruludur.
 
-### Prerequisites
-- Java Development Kit (JDK) 8 or higher.
+## Özel Mesaj Sistemi Nasıl Çalışıyor?
+Uygulama arka planda @kullanici formatını dinlemektedir. Bir istemci gönderim esnasında mesajına `@Ayşe Merhaba` yazarak postalar. Sunucu içindeki `ClientHandler`, mesajı parçaladığı an cümlede @ sembolünün varlığını tespit ederse "Broadcast" işlemi yapmak yerine, kelimeyi ayırarak sistemde 'Ayşe' kullanıcısını arar. Doğrudan onun bağlantı referansına yazma yaparak araya özel (Private) bir tünel açar. Normal kullanıcıların sekmelerinde bu iletişim görülmez.
 
-### Running the Server
-1. Navigate to the source folder.
-2. Compile and run `ChatServer.java`.
-3. The server will start listening silently on port `5000` by default.
+## Dosya Gönderme Mekanizması
+Client sınıfına bağlı `FileTransferManager`, `JFileChooser` yoluyla lokal makinede seçilen disk dosyasını önce bir byte bytearray formatında RAM'e doldurur (Files.readAllBytes). Ardından `FILE|gonderen|dosyaAdi|baytBoyutu` formatında string komutu yollar. Hemen peşi sıra byte array ağa akıtılır. Sunucu tarafı önce header komutunu çözer, belirtilen miktar kadar veriyi `readFully` komutu ile karşılar. Diğer bilgisayarlara ise aynı yolla yollar. Onların ekranında beliren iletişim kutusuna "Evet" demeleri sonucu bu veriler disklerine yazılır.
 
-### Running the Client(s)
-1. Compile and run `ChatGUI.java` (or run it via your IDE).
-2. Enter the Server IP (e.g., `127.0.0.1` for local testing).
-3. Choose a unique username and hit **Connect**.
-4. _Tip: You can launch multiple instances of the Client app simultaneously to test multi-user interactions!_
+## Online Kullanıcı Listesi Nasıl Güncelleniyor?
+Her bağlanma (CONNECT) ve bağlantı bitirme veya Exception durumu (EXIT) anlarında Sunucu tetiklenir. Sunucu yeni oluşan aktif üyeler listesini aralarına virgül koyarak `USERLIST|ali,ayse` formatıyla her bir istemciye yayın (broadcast) olarak gönderir. O esnada açık olan client'ların arayüz tablosu eskisini siler ve bu listeyle saniye saniyesine güncellenir.
 
----
+## Bağlantı Kesilince Sistem Ne Yapıyor?
+Client kendi isteği ile çıkışa basarsa "EXIT|username" komutu yollanır. Bağlantı ani koparsa okuma bloğu `IOException` atar. Bu gerçekleştiği an `finally` blokları sayesinde soket anında düşürülür, açık I/O stream akışları kapanır, ve sunucuya bu kullanıcının gidişi loglanıp listeden ismi silinir. Anında diğer kişilere yeni bir USERLIST bildirilir.
 
-*Developed with ❤️ as a demonstration of Socket Programming and Thread Management fundamentals in Java.*
+### Sınıfların (Class) Görev Tanımları
+- **ChatServer**: Uygulama sunucusudur. Port dinler, istemci listesini bellekte tutar ve ortak fonksiyonlar uygular.
+- **ClientHandler**: Kendi döngüsünde varolan özel bir Thread'dir. Her istemci için tektir ve sadece onu temsil eder.
+- **ChatClient**: İş platformu mantığını çalıştıran ana motorudur. IP ve port kullanarak bağ kurar ve bağlantı yönetir.
+- **ClientListener**: Thread tabanlıdır. İstemci adına ağdan gelen bayt akışlarını veya mesajları bekleyen bekçidir.
+- **ChatGUI**: İstemci tarafında projenin gözüken yüzü, Form'dur. Bütün komponent tepkilerini dinler.
+- **FileTransferManager**: Dosya işlemlerinde kilitlenen GUI'den uzaklaştırılarak byte dönüştürme ve File System mantığını yöneten refactor edilmiş özel kısımdır.
+
+### Program Nasıl Çalıştırılır?
+1. **Server Nasıl Başlatılır:**
+   Proje derlenip çalışırken sistemsel hiçbir I/O parametresine ihtiyaç yoktur. Çözüm dizinindeki `ChatServer` sınıfını çalıştırın (Run). Konsolda "Server baslatildi. Port: 5000" satırını görmeniz yeterlidir.
+2. **Client Nasıl Bağlanır:**
+   `ChatGUI` veya `ChatClient` üzerinden ana sınıfı çalıştırdığınız an önünüze bir arayüz gelir. Hedef IP kısmına `127.0.0.1` veya sunucunun dış IP adresini verin; bir kullanıcı adı doldurarak 'Bağlan' a basmanız yeterlidir. Daha fazla kullanıcı ve eşzamanlı test yapmak için IDE içerisinde (Allow multiple instances vs.) ya da komut penceresinden peş peşe `ChatGUI` uygulamasını defalarca çalıştırabilirsiniz.
